@@ -1,95 +1,111 @@
 #include <FastLED.h>
 #define NUM_LEDS 144
 #define LED_PIN 2
-#define FRAMES_PER_SECOND  60
-#define NUM_OF_FLOATERS 7
-// #define BRIGHTNESS 50
+
+#define MAX_BRIGHTNESS 50 // 255 max
+#define FRAMES_PER_SECOND 30
+
+#define NUM_OF_FLOATERS 3
 
 CRGB leds[NUM_LEDS];
 
-class Boris {
-  public: Boris() {
-    s = random(20, 100); // size -- or "radius"
-    v = random(2, 12) / 20.0; // 2.0 has decimal to cast as float
-    r = random(0, 255);
-    g = 255;
-    b = random(150, 200);
-    x = -100;
-  }
-  public: float s; // size
-  public: float v; // velocity
-  public: float r; // red
-  public: float g; // green
-  public: float b; // blue
-  public: float x; // position on x axis
+class Floater {
+  public: 
+    float r; // radius
+    float x; // position on x axis
+    float v; // velocity
+    float hueDrift; // speed at which hue changes
+
+    // COLOR:
+    float hue; // Hue
+    float saturation; // Saturation
+    float brightness; // Brightness
+
+    Floater() {
+      x = -200; // seems to be needed
+    }
 };
 
-
-Boris hi[NUM_OF_FLOATERS];
+Floater floaters[NUM_OF_FLOATERS];
 
 void setup() {
-
-  // Serial.begin(9600);
-  // Serial.println("Starting app!");
-
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
-  // FastLED.clear();
-  // FastLED.show();
-  // FastLED.setBrightness(BRIGHTNESS);
   FastLED.setDither(0);
+
+  for(int i; i < NUM_OF_FLOATERS; i++) {
+    createNewFloater(i);
+  }
 }
 
 void loop() {
   FastLED.clear();
-  lol();
+ 
+  fill();
+  setMinMax();
+  updatePositions();
+ 
   FastLED.show();
-  FastLED.delay(1000/FRAMES_PER_SECOND);
+  FastLED.delay(1000 / FRAMES_PER_SECOND);
 }
 
-void lol() {
-  fill();
-  for (int z = 0; z < NUM_OF_FLOATERS; z++) {
-    hi[z].x = hi[z].x + hi[z].v;
+void updatePositions() {
+  for (int i = 0; i < NUM_OF_FLOATERS; i++) {
+    floaters[i].x = floaters[i].x + floaters[i].v;
+    floaters[i].hue = floaters[i].hue + floaters[i].hueDrift;
   }
 }
 
 void fill() {
   for (int z = 0; z < NUM_OF_FLOATERS; z++) {
-    if (hi[z].x > NUM_LEDS + hi[z].s || hi[z].x < -hi[z].s) {
-      createNew(z);
+
+    if (floaters[z].x > NUM_LEDS + floaters[z].r || floaters[z].x < -floaters[z].r) {
+      createNewFloater(z);
     }
-    for (int i = floor(hi[z].x - hi[z].s); i < ceil(hi[z].x + hi[z].s); i++) {
-      float brightnessScaler = sq(1 - abs(hi[z].x - i) / hi[z].s);
-      float hueScaler = 1 - sq(abs(hi[z].x - i) / (hi[z].s));
-      // Serial.println(scaler);
+
+    // For all LEDs within the radius of x position, add HSL based on dropoff gradient
+    int lowest = floor(floaters[z].x - floaters[z].r);
+    int highest = ceil(floaters[z].x + floaters[z].r);
+
+    for (int i = lowest; i < highest; i++) {
+
+      float brightnessScaler = sq(1 - abs(floaters[z].x - i) / floaters[z].r);
+      float hueScaler = 1 - sq(abs(floaters[z].x - i) / (floaters[z].r));
+
       if (i >= 0 && i < NUM_LEDS - 1) {
-        leds[i] += CHSV(hi[z].r, max(hi[z].g * hueScaler, 1), max(min(hi[z].b * brightnessScaler, 200), 1));
+        leds[i] += CHSV(floaters[z].hue, 
+                        max(floaters[z].saturation * hueScaler, 1), 
+                        max(min(floaters[z].brightness * brightnessScaler, 200), 1));
       }
     }
-  }
 
-  setMinMax();
+  }
 }
 
+// set minimum and maximum brightness
 void setMinMax() {
   for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] += CHSV(1, 0, 1);
-    leds[i].r = min(leds[i].r, 50);
-    leds[i].g = min(leds[i].g, 50);
-    leds[i].b = min(leds[i].b, 50);
+    leds[i] += CHSV(0, 0, 1); // minimum brightness = 1
+    leds[i].r = min(leds[i].r, MAX_BRIGHTNESS);
+    leds[i].g = min(leds[i].g, MAX_BRIGHTNESS);
+    leds[i].b = min(leds[i].b, MAX_BRIGHTNESS);
   }
 }
 
-void createNew(int index) {
+void createNewFloater(int i) {
+  floaters[i].r = random(20, 100);
+  floaters[i].v = random(2, 12) / 10.0;
+  floaters[i].hue = random(0, 255);
+  floaters[i].saturation = random(150, 255);
+  floaters[i].brightness = random(100, 200);
+  floaters[i].hueDrift = random(0, 10) / 20.0;
+
   bool direction = random(0, 2);
-  hi[index].s = random(20, 100);
-  hi[index].r = random(0, 255);
+
   if (direction) {
-    hi[index].x = -hi[index].s;
-    hi[index].v = random(2, 12) / 20.0;
+    floaters[i].x = -floaters[i].r;
   } else {
-    hi[index].x = NUM_LEDS + hi[index].s;
-    hi[index].v = -random(2, 12) / 20.0;
+    floaters[i].x = NUM_LEDS + floaters[i].r;
+    floaters[i].v = -floaters[i].v;
   }
 }
