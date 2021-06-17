@@ -3,9 +3,9 @@
 #define LED_PIN 2
 
 #define MAX_BRIGHTNESS 50 // 255 max
-#define FRAMES_PER_SECOND 30
+#define FRAMES_PER_SECOND 60
 
-#define NUM_OF_FLOATERS 3
+#define NUM_OF_FLOATERS 5
 
 CRGB leds[NUM_LEDS];
 
